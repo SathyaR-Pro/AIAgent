@@ -1,11 +1,9 @@
-# app/main.py (Implementing Option 1 for chat output)
 import os
 import sys
 import logging
 import json
 import asyncio
 from typing import List, Dict, Any, Optional 
-
 from dotenv import load_dotenv, find_dotenv
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -158,9 +156,9 @@ Your primary function is to determine if the user's request requires searching f
 
             if tool_executed_this_turn and tool_call_candidates:
                 logger.info(f"Executing {len(tool_call_candidates)} tool candidate(s).")
-                formatted_markdown_for_final_response = "Error processing tool results." # Default
+                formatted_markdown_for_final_response = "Error processing tool results."
 
-                for tool_call in tool_call_candidates: # Expecting one tool call
+                for tool_call in tool_call_candidates:
                     if not isinstance(tool_call, dict) or 'function' not in tool_call: logger.warning(f"Malformed tool_call: {tool_call}"); continue
                     tool_function_data: Dict[str, Any] = tool_call['function'] 
                     tool_name: Optional[str] = tool_function_data.get('name')
@@ -170,7 +168,7 @@ Your primary function is to determine if the user's request requires searching f
                     if not tool_name: 
                         logger.warning(f"Tool call no name: {tool_call}")
                         formatted_markdown_for_final_response = "Error: Tool call was malformed (missing name)."
-                        break # Exit loop as we can't proceed
+                        break 
 
                     tool_args: Dict[str, Any] = {}; 
                     if isinstance(tool_args_raw, str): 
@@ -182,8 +180,7 @@ Your primary function is to determine if the user's request requires searching f
                     elif isinstance(tool_args_raw, dict): tool_args = tool_args_raw
                     else: 
                         logger.warning(f"Tool args for {tool_name} not str/dict: {type(tool_args_raw)}. Using empty.")
-                        # Potentially treat as error or proceed with empty args depending on tool design
-                        # For now, let's assume this might be an error state for presentation
+                  
                         formatted_markdown_for_final_response = f"Error: Tool arguments for {tool_name} had an unexpected type."
                         break
 
@@ -193,7 +190,6 @@ Your primary function is to determine if the user's request requires searching f
                         try:
                             tool_result_json_string: str = await asyncio.to_thread(tool_function_to_call, **tool_args)
                             
-                            # --- PYTHON-SIDE FORMATTING OF TOOL OUTPUT ---
                             try:
                                 tool_data = json.loads(tool_result_json_string)
                                 if isinstance(tool_data, dict) and tool_data.get("message"): 
@@ -202,7 +198,7 @@ Your primary function is to determine if the user's request requires searching f
                                      formatted_markdown_for_final_response = f"Error from tool: {tool_data['error']}"
                                 elif isinstance(tool_data, list) and tool_data: 
                                     md_items = []
-                                    for doc in tool_data: # Iterate through all documents
+                                    for doc in tool_data:
                                         md_items.append(
                                             f"- **Title:** {doc.get('title', 'N/A')}\n"
                                             f"- **Document Number:** {doc.get('document_number', 'N/A')}\n"
@@ -226,9 +222,8 @@ Your primary function is to determine if the user's request requires searching f
                     else: 
                         logger.warning(f"Tool '{tool_name}' not found.")
                         formatted_markdown_for_final_response = f"Error: Tool '{tool_name}' not available."
-                    break # Assuming only one tool call per turn for now
+                    break
                 
-                # --- Use Python-formatted output directly ---
                 if "No executive orders found" in formatted_markdown_for_final_response or \
                    "Error from tool" in formatted_markdown_for_final_response or \
                    "Error: Tool data invalid" in formatted_markdown_for_final_response or \
@@ -243,7 +238,6 @@ Your primary function is to determine if the user's request requires searching f
                 
                 logger.info(f"Final agent response constructed in Python: '{final_agent_response_text[:300]}...'")
 
-            # If no tool was executed, final_agent_response_text was set by earlier logic (direct LLM reply)
             
         except Exception as e:
             logger.error(f"Ollama processing error: {e}", exc_info=True)
