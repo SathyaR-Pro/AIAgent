@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Brief Agent Chat</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .chat-container {
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 600px;
+            max-height: 90vh;
+        }
+        .chat-header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #388E3C;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: #e9ecef;
+        }
+        .message-bubble {
+            max-width: 75%;
+            padding: 12px 18px;
+            border-radius: 20px;
+            line-height: 1.4;
+            word-wrap: break-word;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        .message-bubble.user {
+            align-self: flex-end;
+            background-color: #DCF8C6;
+            color: #333;
+            border-bottom-right-radius: 5px;
+        }
+        .message-bubble.agent {
+            align-self: flex-start;
+            background-color: #fff;
+            color: #333;
+            border: 1px solid #ddd;
+            border-bottom-left-radius: 5px;
+        }
+        .message-bubble.error {
+            align-self: flex-start;
+            background-color: #ffebee;
+            color: #D32F2F;
+            border: 1px solid #EF5350;
+        }
+        .message-bubble.typing { /* Added for completeness, though JS logic uses 'agent' style */
+            align-self: flex-start;
+            background-color: #f0f0f0;
+            color: #555;
+            font-style: italic;
+            padding: 8px 15px;
+        }
+        .input-area {
+            display: flex;
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            background-color: #fcfcfc;
+            gap: 10px;
+        }
+        .input-area input[type="text"] {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-area input[type="text"]:focus {
+            border-color: #4CAF50;
+        }
+        .input-area button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .input-area button:hover:not(:disabled) {
+            background-color: #45a049;
+            transform: translateY(-1px);
+        }
+        .input-area button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            Daily Brief Agent
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="message-bubble agent">
+                Hello! I can help you search for federal executive orders. What are you looking for?
+            </div>
+        </div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Type your message..." autofocus>
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+
+   <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sendButton = document.getElementById('send-button');
+        const messageInput = document.getElementById('user-input');
+        const chatBox = document.getElementById('chat-messages');
+        let typingIndicator = null;
+
+        const appendMessage = (text, type) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message-bubble', type);
+            messageDiv.textContent = text;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        };
+
+        const showTypingIndicator = () => {
+            if (!typingIndicator) {
+                typingIndicator = document.createElement('div');
+                typingIndicator.classList.add('message-bubble', 'agent', 'typing');
+                typingIndicator.textContent = 'Agent is typing...';
+                chatBox.appendChild(typingIndicator);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        };
+
+        const hideTypingIndicator = () => {
+            if (typingIndicator) {
+                chatBox.removeChild(typingIndicator);
+                typingIndicator = null;
+            }
+        };
+
+        const sendMessage = async () => {
+            const userMessage = messageInput.value.trim();
+            if (!userMessage) return;
+
+            appendMessage(userMessage, 'user');
+            messageInput.value = '';
+            sendButton.disabled = true;
+            messageInput.disabled = true;
+
+            showTypingIndicator();
+
+            try {
+                const formData = new FormData();
+                formData.append('user_message', userMessage);
+
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                hideTypingIndicator();
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const agentResponse = data.response;
+                    if (agentResponse) {
+                        appendMessage(agentResponse, 'agent');
+                    } else {
+                        appendMessage("Received an empty response from the agent.", 'error');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('Error sending message:', response.status, errorText);
+                    let displayError = errorText;
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        if (errorJson.detail) { displayError = errorJson.detail; }
+                        else if (errorJson.response) { displayError = errorJson.response; }
+                    } catch (e) { /* Not JSON, use errorText */ }
+                    appendMessage(`Error ${response.status}: ${displayError}`, 'error');
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                console.error('Network or fetch error:', error);
+                appendMessage(`Network Error: ${error.message || 'Could not reach server.'}`, 'error');
+            } finally {
+                sendButton.disabled = false;
+                messageInput.disabled = false;
+                messageInput.focus();
+            }
+        };
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter' && !sendButton.disabled) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+    });
+</script>
+</body>
+</html>
